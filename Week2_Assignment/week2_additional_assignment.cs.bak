@@ -1,0 +1,607 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+
+enum Priority
+{
+    Low,
+    Medium,
+    High
+}
+
+class Program
+{
+    static void Main(string[] args)
+    {
+        bool exit = false;
+
+        while (!exit)
+        {
+            ShowMainMenu();
+            string choice = Console.ReadLine() ?? "";
+
+            switch (choice)
+            {
+                case "1":
+                    TaskManager.Run();
+                    break;
+
+                case "2":
+                    StudentManager.Run();
+                    break;
+
+                case "3":
+                    BankingSystem.Run();
+                    break;
+
+                case "4":
+                    exit = true;
+                    Console.WriteLine("Exiting the entire system. Goodbye!");
+                    break;
+
+                default:
+                    Console.WriteLine("Invalid choice. Please select 1-4.");
+                    break;
+            }
+        }
+    }
+
+    static void ShowMainMenu()
+    {
+        Console.WriteLine("\n==============================");
+        Console.WriteLine("   List of Projects");
+        Console.WriteLine("==============================");
+        Console.WriteLine("1. Task Management System");
+        Console.WriteLine("2. Student Grading System");
+        Console.WriteLine("3. Banking System");
+        Console.WriteLine("4. Exit");
+        Console.Write("Choose an option: ");
+    }
+}
+
+static class TaskManager
+{
+    static List<TaskItem> tasks = new List<TaskItem>();
+    static readonly string filePath = "tasks.txt";
+
+    public static void Run()
+    {
+        LoadFromFile(); // load once when entering this module
+
+        bool exit = false;
+        while (!exit)
+        {
+            Console.WriteLine("\n--- TASK MANAGEMENT SYSTEM ---");
+            Console.WriteLine("1. Add Task");
+            Console.WriteLine("2. View All Tasks");
+            Console.WriteLine("3. Mark Task as Completed");
+            Console.WriteLine("4. Delete Task");
+            Console.WriteLine("5. Filter Tasks by Priority");
+            Console.WriteLine("6. Sort Tasks by Due Date");
+            Console.WriteLine("7. Save Tasks to File");
+            Console.WriteLine("8. Back to Main Menu");
+            Console.Write("Choose: ");
+
+            string choice = Console.ReadLine() ?? "";
+
+            switch (choice)
+            {
+                case "1":
+                    AddTask();
+                    break;
+                case "2":
+                    ViewAll();
+                    break;
+                case "3":
+                    MarkCompleted();
+                    break;
+                case "4":
+                    DeleteTask();
+                    break;
+                case "5":
+                    FilterByPriority();
+                    break;
+                case "6":
+                    SortByDueDate();
+                    break;
+                case "7":
+                    SaveToFile();
+                    break;
+                case "8":
+                    exit = true;
+                    break;
+                default:
+                    Console.WriteLine("Invalid choice. Select 1-8.");
+                    break;
+            }
+        }
+    }
+
+    static void AddTask()
+    {
+        Console.Write("Title: ");
+        string title = Console.ReadLine() ?? "";
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            Console.WriteLine("Title cannot be empty.");
+            return;
+        }
+
+        Console.Write("Description: ");
+        string description = Console.ReadLine() ?? "";
+
+        Priority priority = ReadPriority();
+        DateTime dueDate = ReadDate("Due date (yyyy-MM-dd): ");
+
+        tasks.Add(new TaskItem(title.Trim(), description.Trim(), priority, dueDate, false));
+        Console.WriteLine("Task added.");
+    }
+
+    static void ViewAll()
+    {
+        if (tasks.Count == 0)
+        {
+            Console.WriteLine("No tasks available.");
+            return;
+        }
+
+        Console.WriteLine("\nTasks:");
+        for (int i = 0; i < tasks.Count; i++)
+        {
+            Console.Write($"{i + 1}. ");
+            tasks[i].Display(); // Display() prints nicely without breaking file saving
+        }
+    }
+
+    static void MarkCompleted()
+    {
+        if (tasks.Count == 0)
+        {
+            Console.WriteLine("No tasks available.");
+            return;
+        }
+
+        ViewAll();
+        int index = ReadIndex("Enter task number to mark completed: ", tasks.Count);
+        tasks[index].IsCompleted = true;
+        Console.WriteLine("Marked as completed.");
+    }
+
+    static void DeleteTask()
+    {
+        if (tasks.Count == 0)
+        {
+            Console.WriteLine("No tasks available.");
+            return;
+        }
+
+        ViewAll();
+        int index = ReadIndex("Enter task number to delete: ", tasks.Count);
+        tasks.RemoveAt(index);
+        Console.WriteLine("Task deleted.");
+    }
+
+    static void FilterByPriority()
+    {
+        if (tasks.Count == 0)
+        {
+            Console.WriteLine("No tasks available.");
+            return;
+        }
+
+        Priority p = ReadPriority();
+        var filtered = tasks.Where(t => t.Priority == p).ToList();
+
+        if (filtered.Count == 0)
+        {
+            Console.WriteLine($"No tasks with {p} priority.");
+            return;
+        }
+
+        Console.WriteLine($"\nTasks with {p} priority:");
+        for (int i = 0; i < filtered.Count; i++)
+        {
+            Console.Write($"{i + 1}. ");
+            filtered[i].Display();
+        }
+    }
+
+    static void SortByDueDate()
+    {
+        // Sort in-place so the main list is actually updated
+        tasks = tasks.OrderBy(t => t.DueDate).ToList();
+        Console.WriteLine("Tasks sorted by due date.");
+        ViewAll();
+    }
+
+    static void SaveToFile()
+    {
+        // Save in a simple pipe format so load is easy and consistent
+        using (var writer = new StreamWriter(filePath))
+        {
+            foreach (var task in tasks)
+                writer.WriteLine(task.ToFileLine());
+        }
+
+        Console.WriteLine($"Saved {tasks.Count} task(s) to {filePath}");
+    }
+
+    static void LoadFromFile()
+    {
+        tasks.Clear();
+
+        if (!File.Exists(filePath))
+            return;
+
+        foreach (string line in File.ReadAllLines(filePath))
+        {
+            var task = TaskItem.TryParse(line);
+            if (task != null)
+                tasks.Add(task);
+        }
+    }
+
+    static Priority ReadPriority()
+    {
+        while (true)
+        {
+            Console.Write("Priority (Low/Medium/High): ");
+            string input = Console.ReadLine() ?? "";
+
+            if (Enum.TryParse(input, true, out Priority p))
+                return p;
+
+            Console.WriteLine("Invalid priority. Try Low, Medium, or High.");
+        }
+    }
+
+    static DateTime ReadDate(string prompt)
+    {
+        while (true)
+        {
+            Console.Write(prompt);
+            string input = Console.ReadLine() ?? "";
+
+            // TryParse keeps it friendly (no crash, user can re-try)
+            if (DateTime.TryParse(input, out DateTime date))
+                return date;
+
+            Console.WriteLine("Invalid date. Use format like 2026-01-17.");
+        }
+    }
+
+    static int ReadIndex(string prompt, int max)
+    {
+        while (true)
+        {
+            Console.Write(prompt);
+            string input = Console.ReadLine() ?? "";
+
+            if (int.TryParse(input, out int n) && n >= 1 && n <= max)
+                return n - 1;
+
+            Console.WriteLine($"Enter a number between 1 and {max}.");
+        }
+    }
+}
+
+class TaskItem
+{
+    public string Title { get; set; }
+    public string Description { get; set; }
+    public Priority Priority { get; set; }
+    public DateTime DueDate { get; set; }
+    public bool IsCompleted { get; set; }
+
+    public TaskItem(string title, string description, Priority priority, DateTime dueDate, bool isCompleted)
+    {
+        Title = title;
+        Description = description;
+        Priority = priority;
+        DueDate = dueDate;
+        IsCompleted = isCompleted;
+    }
+
+    public void Display()
+    {
+        // Display is separate from saving, so file output stays clean
+        Console.WriteLine($"{Title} | {Description} | {Priority} | {DueDate:yyyy-MM-dd} | {(IsCompleted ? "Completed" : "Pending")}");
+    }
+
+    public string ToFileLine()
+    {
+        // Pipe format: Title|Description|Priority|DueDate|Status
+        return $"{Title}|{Description}|{Priority}|{DueDate:yyyy-MM-dd}|{(IsCompleted ? "Completed" : "Pending")}";
+    }
+
+    public static TaskItem? TryParse(string line)
+    {
+        var parts = line.Split('|');
+        if (parts.Length != 5) return null;
+
+        string title = parts[0].Trim();
+        string desc = parts[1].Trim();
+
+        if (!Enum.TryParse(parts[2].Trim(), true, out Priority p))
+            return null;
+
+        if (!DateTime.TryParse(parts[3].Trim(), out DateTime due))
+            return null;
+
+        bool completed = parts[4].Trim().Equals("Completed", StringComparison.OrdinalIgnoreCase);
+
+        return new TaskItem(title, desc, p, due, completed);
+    }
+}
+
+static class StudentManager
+{
+    static List<Student> students = new List<Student>();
+
+    public static void Run()
+    {
+        bool exit = false;
+
+        while (!exit)
+        {
+            Console.WriteLine("\n--- STUDENT GRADING SYSTEM ---");
+            Console.WriteLine("1. Add Student");
+            Console.WriteLine("2. View All Students");
+            Console.WriteLine("3. Add Grade to Student");
+            Console.WriteLine("4. Calculate Average for Student");
+            Console.WriteLine("5. Back to Main Menu");
+            Console.Write("Choose: ");
+
+            string choice = Console.ReadLine() ?? "";
+
+            switch (choice)
+            {
+                case "1":
+                    AddStudent();
+                    break;
+                case "2":
+                    ViewAllStudents();
+                    break;
+                case "3":
+                    AddGradeToStudent();
+                    break;
+                case "4":
+                    ShowAverageForStudent();
+                    break;
+                case "5":
+                    exit = true;
+                    break;
+                default:
+                    Console.WriteLine("Invalid choice. Select 1-5.");
+                    break;
+            }
+        }
+    }
+
+    static void AddStudent()
+    {
+        Console.Write("Student name: ");
+        string name = Console.ReadLine() ?? "";
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            Console.WriteLine("Name cannot be empty.");
+            return;
+        }
+
+        students.Add(new Student(name.Trim()));
+        Console.WriteLine($"Student '{name.Trim()}' added.");
+    }
+
+    static void ViewAllStudents()
+    {
+        if (students.Count == 0)
+        {
+            Console.WriteLine("No students in the system.");
+            return;
+        }
+
+        Console.WriteLine("\nStudents:");
+        for (int i = 0; i < students.Count; i++)
+        {
+            string gradesText = students[i].Grades.Count == 0 ? "No grades" : string.Join(", ", students[i].Grades.Select(g => g.ToString("F1")));
+            Console.WriteLine($"{i + 1}. {students[i].Name} (Grades: {gradesText})");
+        }
+    }
+
+    static void AddGradeToStudent()
+    {
+        if (students.Count == 0)
+        {
+            Console.WriteLine("Add a student first.");
+            return;
+        }
+
+        ViewAllStudents();
+        int index = ReadIndex("Choose student number: ", students.Count);
+
+        double grade = ReadGrade("Enter grade (0-100): ");
+        students[index].Grades.Add(grade);
+
+        Console.WriteLine($"Added {grade:F1} to {students[index].Name}.");
+    }
+
+    static void ShowAverageForStudent()
+    {
+        if (students.Count == 0)
+        {
+            Console.WriteLine("Add a student first.");
+            return;
+        }
+
+        ViewAllStudents();
+        int index = ReadIndex("Choose student number: ", students.Count);
+
+        double avg = students[index].Average();
+        Console.WriteLine($"Average for {students[index].Name}: {avg:F2}");
+    }
+
+    static double ReadGrade(string prompt)
+    {
+        while (true)
+        {
+            Console.Write(prompt);
+            string input = Console.ReadLine() ?? "";
+
+            if (double.TryParse(input, out double grade) && grade >= 0 && grade <= 100)
+                return grade;
+
+            Console.WriteLine("Invalid grade. Enter a number from 0 to 100.");
+        }
+    }
+
+    static int ReadIndex(string prompt, int max)
+    {
+        while (true)
+        {
+            Console.Write(prompt);
+            string input = Console.ReadLine() ?? "";
+
+            if (int.TryParse(input, out int n) && n >= 1 && n <= max)
+                return n - 1;
+
+            Console.WriteLine($"Enter a number between 1 and {max}.");
+        }
+    }
+}
+
+class Student
+{
+    public string Name { get; set; }
+    public List<double> Grades { get; set; } = new List<double>();
+
+    public Student(string name)
+    {
+        Name = name;
+    }
+
+    public double Average()
+    {
+        if (Grades.Count == 0) return 0.0;
+        return Grades.Sum() / Grades.Count;
+    }
+}
+
+static class BankingSystem
+{
+    static decimal balance = 0m;
+    const string correctPin = "1234"; // demo PIN for assignment
+
+    public static void Run()
+    {
+        // PIN is required each time you enter the banking module
+        if (!Login())
+        {
+            Console.WriteLine("Too many failed attempts. Banking system locked.");
+            return;
+        }
+
+        bool exit = false;
+        while (!exit)
+        {
+            Console.WriteLine("\n--- BANKING SYSTEM ---");
+            Console.WriteLine("1. Deposit");
+            Console.WriteLine("2. Withdraw");
+            Console.WriteLine("3. Balance Inquiry");
+            Console.WriteLine("4. Back to Main Menu");
+            Console.Write("Choose: ");
+
+            if (!int.TryParse(Console.ReadLine(), out int choice))
+            {
+                Console.WriteLine("Invalid input. Enter 1-4.");
+                continue;
+            }
+
+            // Switch is required by the syllabus for banking choices
+            switch (choice)
+            {
+                case 1:
+                    Deposit();
+                    break;
+                case 2:
+                    Withdraw();
+                    break;
+                case 3:
+                    BalanceInquiry();
+                    break;
+                case 4:
+                    exit = true;
+                    break;
+                default:
+                    Console.WriteLine("Choose between 1 and 4.");
+                    break;
+            }
+        }
+    }
+
+    static bool Login()
+    {
+        int attempts = 0;
+
+        while (attempts < 3)
+        {
+            Console.Write("Enter PIN: ");
+            string entered = Console.ReadLine() ?? "";
+
+            if (entered == correctPin)
+            {
+                Console.WriteLine("Login successful!");
+                return true;
+            }
+
+            attempts++;
+            Console.WriteLine($"Wrong PIN. Attempts left: {3 - attempts}");
+        }
+
+        return false;
+    }
+
+    static void Deposit()
+    {
+        decimal amount = ReadPositiveMoney("Enter deposit amount: ");
+        balance += amount;
+        Console.WriteLine($"Deposit successful. New balance: {balance:N2}");
+    }
+
+    static void Withdraw()
+    {
+        decimal amount = ReadPositiveMoney("Enter withdrawal amount: ");
+
+        // Basic rule: don’t allow overdraft
+        if (amount > balance)
+        {
+            Console.WriteLine("Error: Insufficient funds.");
+            Console.WriteLine($"Current balance: {balance:N2}");
+            return;
+        }
+
+        balance -= amount;
+        Console.WriteLine($"Withdrawal successful. New balance: {balance:N2}");
+    }
+
+    static void BalanceInquiry()
+    {
+        Console.WriteLine($"Current balance: {balance:N2}");
+    }
+
+    static decimal ReadPositiveMoney(string prompt)
+    {
+        while (true)
+        {
+            Console.Write(prompt);
+            string input = Console.ReadLine() ?? "";
+
+            // Decimal is better for money than double (avoids rounding surprises)
+            if (decimal.TryParse(input, out decimal amount) && amount > 0)
+                return amount;
+
+            Console.WriteLine("Invalid amount. Enter a positive number.");
+        }
+    }
+}
