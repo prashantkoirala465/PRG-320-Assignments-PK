@@ -1,0 +1,12 @@
+{
+  "$type": "System.Collections.Generic.List`1[[LibraryManagementSystemExtended.Interface.ILibraryItem, LibraryManagementSystemExtended]], System.Private.CoreLib",
+  "$values": [
+    {
+      "$type": "LibraryManagementSystemExtended.Model.Book, LibraryManagementSystemExtended",
+      "Author": "F Scott Fitzgerald",
+      "Title": "The Great Gatsby",
+      "Publisher": "Penguin",
+      "PublicationYear": 1925
+    }
+  ]
+}
